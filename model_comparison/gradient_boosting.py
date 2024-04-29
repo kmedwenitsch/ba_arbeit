@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 # CSV-Datei einlesen
@@ -14,11 +14,14 @@ df_train['weekday'] = df_train['timestamp'].dt.weekday  # Wochentag (Montag=0, S
 df_train['month'] = df_train['timestamp'].dt.month  # Monat
 
 # Modellinitialisierung
-model = LinearRegression()
+model = GradientBoostingRegressor()
 
 # Trainieren des Modells
 X = df_train[['hour', 'weekday', 'month']]
-y = df_train['AT0090000000000000000X312X009800E']
+
+# Logarithmische Transformation der Zielvariable, damit Prognosewerte immer positiv sind
+y = np.log1p(df_train['AT0090000000000000000X312X009800E'])
+
 model.fit(X, y)
 
 # Vorhersagen für den 30.12.2024 in 15-minütigen Zeitabständen
@@ -28,7 +31,12 @@ future_features = pd.DataFrame({
     'weekday': future_timestamps.weekday,
     'month': future_timestamps.month
 })
-future_predictions = model.predict(future_features)
+future_predictions_log = model.predict(future_features)
+
+# Umkehrung der logarithmischen Transformation der Prognosen
+future_predictions = np.expm1(future_predictions_log)
+
+print(future_predictions)
 
 # Berechnung der Metriken
 y_true = df_test.loc[(df_test['timestamp'] >= '30.12.2023 00:00:00') & (df_test['timestamp'] <= '30.12.2023 23:45:00'), 'AT0090000000000000000X312X009800E'].values
