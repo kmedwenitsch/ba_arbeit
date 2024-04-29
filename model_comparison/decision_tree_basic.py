@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 # CSV-Datei einlesen
@@ -14,7 +14,7 @@ df_train['weekday'] = df_train['timestamp'].dt.weekday  # Wochentag (Montag=0, S
 df_train['month'] = df_train['timestamp'].dt.month  # Monat
 
 # Modellinitialisierung
-model = LinearRegression()
+model = DecisionTreeRegressor()
 
 # Trainieren des Modells
 X = df_train[['hour', 'weekday', 'month']]
@@ -22,7 +22,7 @@ y = df_train['AT0090000000000000000X312X009800E']
 model.fit(X, y)
 
 # Vorhersagen für den 30.12.2024 in 15-minütigen Zeitabständen
-future_timestamps = pd.date_range(start='2023-12-30 00:00:00', end='2023-12-30 23:45:00', freq='15min')
+future_timestamps = pd.date_range(start='2023-12-30 00:00:00', end='2023-12-31 23:45:00', freq='15min')
 future_features = pd.DataFrame({
     'hour': future_timestamps.hour,
     'weekday': future_timestamps.weekday,
@@ -31,7 +31,7 @@ future_features = pd.DataFrame({
 future_predictions = model.predict(future_features)
 
 # Berechnung der Metriken
-y_true = df_test.loc[(df_test['timestamp'] >= '30.12.2023') & (df_test['timestamp'] < '31.12.2023'), 'AT0090000000000000000X312X009800E'].values
+y_true = df_test.loc[(df_test['timestamp'] >= '30.12.2023 00:00:00') & (df_test['timestamp'] <= '31.12.2023 23:45:00'), 'AT0090000000000000000X312X009800E'].values
 
 print("Anzahl der Vorhersagen:", len(future_predictions))
 print("Anzahl der tatsächlichen Werte:", len(y_true))
@@ -50,7 +50,7 @@ print("Root Mean Squared Error (RMSE):", rmse)
 # Grafische Darstellung der Inputdaten
 plt.figure(figsize=(12, 6))
 plt.plot(future_timestamps, future_predictions, color='green', linestyle='--', label='Predicted Values')
-plt.title('Energy Production Prediction for 30.12.2023')
+plt.title('Energy Production Prediction for 30.12.2023 and 31.12.2023')
 plt.xlabel('Timestamp')
 plt.ylabel('Energy Production')
 plt.legend()
