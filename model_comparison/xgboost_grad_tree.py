@@ -6,7 +6,7 @@ from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 # CSV-Datei einlesen
-data = pd.read_csv('../input_data/Neudörfl_Production_full_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
+data = pd.read_csv('../input_data/Neudörfl_Production_bis_21042024_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
 
 # Extrahieren von Merkmalen aus dem Zeitstempel
 data['timestamp'] = pd.to_datetime(data['timestamp'])
@@ -66,6 +66,9 @@ model.fit(X_train, y_train)
 # Vorhersagen für den Testdatensatz
 predictions = model.predict(X_test)
 
+# Clippen der Vorhersagen auf positive Werte
+predictions = np.clip(predictions, a_min=0, a_max=None)
+
 # Berechnung der Metriken für die Vorhersagen
 mse = mean_squared_error(y_test, predictions)
 mae = mean_absolute_error(y_test, predictions)
@@ -79,9 +82,9 @@ print("Root Mean Squared Error (RMSE):", rmse)
 plt.figure(figsize=(12, 6))
 plt.plot(y_test, color='blue', label='Actual')
 plt.plot(predictions, color='green', linestyle='--', label='Predicted')
-plt.title('Energy Consumption Prediction (XGBoost)')
+plt.title('Energy Production Prediction (XGBoost)')
 plt.xlabel('Time')
-plt.ylabel('Energy Consumption')
+plt.ylabel('Energy Production')
 plt.legend()
 plt.grid(True)
 plt.xticks(rotation=45)
