@@ -38,6 +38,13 @@ future_predictions = np.expm1(future_predictions_log)
 
 print(future_predictions)
 
+print("Gradient Boosting Model Parameters:")
+print("Number of Estimators:", model.n_estimators)
+print("Learning Rate:", model.learning_rate)
+print("Max Depth:", model.max_depth)
+print("Min Samples Split:", model.min_samples_split)
+print("Min Samples Leaf:", model.min_samples_leaf)
+
 # Berechnung der Metriken
 y_true = df_test.loc[(df_test['timestamp'] >= '30.12.2023 00:00:00') & (df_test['timestamp'] <= '30.12.2023 23:45:00'), 'AT0090000000000000000X312X009800E'].values
 
