@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from workalendar.europe import Austria
 
 # CSV-Datei einlesen
 data = pd.read_csv('../input_data/Neudörfl_Production_full_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
@@ -15,12 +14,43 @@ data['hour'] = data['timestamp'].dt.hour
 data['day_of_week'] = data['timestamp'].dt.dayofweek
 data['month'] = data['timestamp'].dt.month
 
-# Festlegen von Feiertagen
-cal = Austria()
-holidays = cal.holidays(2023)  # Annahme: Das Jahr 2023 für Feiertage in Österreich
+# Manuell erstellte Liste von Feiertagen für Österreich
+holidays_2023 = [
+    '2023-01-01',  # Neujahr
+    '2023-01-06',  # Heilige Drei Könige
+    '2023-04-14',  # Karfreitag
+    '2023-04-17',  # Ostermontag
+    '2023-05-01',  # Tag der Arbeit
+    '2023-05-25',  # Christi Himmelfahrt
+    '2023-06-04',  # Pfingstsonntag
+    '2023-06-05',  # Pfingstmontag
+    '2023-06-15',  # Fronleichnam
+    '2023-10-26',  # Nationalfeiertag
+    '2023-11-01',  # Allerheiligen
+    '2023-12-08',  # Mariä Empfängnis
+    '2023-12-25',  # Weihnachten
+    '2023-12-26'   # Stephanitag
+]
+
+holidays_2024 = [
+    '2024-01-01',  # Neujahr
+    '2024-01-06',  # Heilige Drei Könige
+    '2024-03-29',  # Karfreitag
+    '2024-04-01',  # Ostermontag
+    '2024-05-01',  # Tag der Arbeit
+    '2024-05-09',  # Christi Himmelfahrt
+    '2024-05-19',  # Pfingstsonntag
+    '2024-05-20',  # Pfingstmontag
+    '2024-06-06',  # Fronleichnam
+    '2024-10-26',  # Nationalfeiertag
+    '2024-11-01',  # Allerheiligen
+    '2024-12-08',  # Mariä Empfängnis
+    '2024-12-25',  # Weihnachten
+    '2024-12-26'   # Stephanitag
+]
 
 # Hinzufügen einer Spalte für Feiertage
-data['is_holiday'] = data['timestamp'].dt.date.astype('datetime64').isin(holidays).astype(int)
+data['is_holiday'] = data['timestamp'].dt.date.astype('datetime64[ns]').isin(holidays_2023 + holidays_2024).astype(int)
 
 data.set_index('timestamp', inplace=True)
 
@@ -49,9 +79,9 @@ print("Root Mean Squared Error (RMSE):", rmse)
 plt.figure(figsize=(12, 6))
 plt.plot(y_test, color='blue', label='Actual')
 plt.plot(predictions, color='green', linestyle='--', label='Predicted')
-plt.title('Energy Production Prediction (XGBoost)')
+plt.title('Energy Consumption Prediction (XGBoost)')
 plt.xlabel('Time')
-plt.ylabel('Energy Production')
+plt.ylabel('Energy Consumption')
 plt.legend()
 plt.grid(True)
 plt.xticks(rotation=45)
