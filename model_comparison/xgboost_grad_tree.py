@@ -7,7 +7,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from workalendar.europe import Austria
 
 # CSV-Datei einlesen
-data = pd.read_csv('energy_consumption_data.csv', parse_dates=['timestamp'])
+data = pd.read_csv('../input_data/Neudörfl_Production_full_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
 
 # Extrahieren von Merkmalen aus dem Zeitstempel
 data['timestamp'] = pd.to_datetime(data['timestamp'])
@@ -26,7 +26,7 @@ data.set_index('timestamp', inplace=True)
 
 # Zufälliges Aufteilen der Daten in Trainings- und Testsets
 X = data[['hour', 'day_of_week', 'month', 'is_holiday']].values
-y = data['energy_consumption'].values
+y = data['AT0090000000000000000X312X009800E'].values
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
 # Modellinitialisierung und Training
@@ -49,9 +49,9 @@ print("Root Mean Squared Error (RMSE):", rmse)
 plt.figure(figsize=(12, 6))
 plt.plot(y_test, color='blue', label='Actual')
 plt.plot(predictions, color='green', linestyle='--', label='Predicted')
-plt.title('Energy Consumption Prediction (XGBoost)')
+plt.title('Energy Production Prediction (XGBoost)')
 plt.xlabel('Time')
-plt.ylabel('Energy Consumption')
+plt.ylabel('Energy Production')
 plt.legend()
 plt.grid(True)
 plt.xticks(rotation=45)
