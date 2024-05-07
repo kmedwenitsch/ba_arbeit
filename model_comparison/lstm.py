@@ -1,110 +1,105 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from keras.models import Sequential
 from keras.layers import LSTM, Dense
 
 # CSV-Datei einlesen
-df = pd.read_csv('../input_data/Neudörfl_Production_full_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
-# df_train = pd.read_csv('../input_data/Neudörfl_Production_Training_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
-# df_test = pd.read_csv('../input_data/Neudörfl_Production_Test_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
+data = pd.read_csv('../input_data/Neudörfl_Production_bis_21042024_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
 
 # Extrahieren von Merkmalen aus dem Zeitstempel
-df['timestamp'] = pd.to_datetime(df['timestamp'])
-df['hour'] = df['timestamp'].dt.hour
-df['day_of_week'] = df['timestamp'].dt.dayofweek
-df['month'] = df['timestamp'].dt.month
-df.set_index('timestamp', inplace=True)
+data['timestamp'] = pd.to_datetime(data['timestamp'])
+data['hour'] = data['timestamp'].dt.hour
+data['day_of_week'] = data['timestamp'].dt.dayofweek
+data['month'] = data['timestamp'].dt.month
 
-# Normalisierung der Daten
-scaler = MinMaxScaler()
-df_normalized = scaler.fit_transform(df)
+# Manuell erstellte Liste von Feiertagen für Österreich
+holidays_2023 = [
+    '2023-01-01',  # Neujahr
+    '2023-01-06',  # Heilige Drei Könige
+    '2023-04-14',  # Karfreitag
+    '2023-04-17',  # Ostermontag
+    '2023-05-01',  # Tag der Arbeit
+    '2023-05-25',  # Christi Himmelfahrt
+    '2023-06-04',  # Pfingstsonntag
+    '2023-06-05',  # Pfingstmontag
+    '2023-06-15',  # Fronleichnam
+    '2023-10-26',  # Nationalfeiertag
+    '2023-11-01',  # Allerheiligen
+    '2023-12-08',  # Mariä Empfängnis
+    '2023-12-25',  # Weihnachten
+    '2023-12-26'   # Stephanitag
+]
 
+holidays_2024 = [
+    '2024-01-01',  # Neujahr
+    '2024-01-06',  # Heilige Drei Könige
+    '2024-03-29',  # Karfreitag
+    '2024-04-01',  # Ostermontag
+    '2024-05-01',  # Tag der Arbeit
+    '2024-05-09',  # Christi Himmelfahrt
+    '2024-05-19',  # Pfingstsonntag
+    '2024-05-20',  # Pfingstmontag
+    '2024-06-06',  # Fronleichnam
+    '2024-10-26',  # Nationalfeiertag
+    '2024-11-01',  # Allerheiligen
+    '2024-12-08',  # Mariä Empfängnis
+    '2024-12-25',  # Weihnachten
+    '2024-12-26'   # Stephanitag
+]
 
-# Funktion zum Aufteilen der Daten in Trainings- und Testsets
-def split_data(data, split_ratio=0.8):
-    split_index = int(len(data) * split_ratio)
-    train_data = data[:split_index]
-    test_data = data[split_index:]
-    return train_data, test_data
+# Hinzufügen einer Spalte für Feiertage
+data['is_holiday'] = data['timestamp'].dt.date.astype('datetime64[ns]').isin(holidays_2023 + holidays_2024).astype(int)
+data = data.drop_duplicates(subset=['timestamp'])
+data.set_index('timestamp', inplace=True)
 
-# Aufteilen der Daten in Trainings- und Testsets
-train_data, test_data = split_data(df_normalized)
+# Zufälliges Aufteilen der Daten in Trainings- und Testsets
+X = data[['hour', 'day_of_week', 'month', 'is_holiday']].values
+y = data['AT0090000000000000000X312X009800E'].values
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
 
+# Daten skalieren
+scaler = MinMaxScaler(feature_range=(0, 1))
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-# Funktion zum Erstellen von Sequenzen für das LSTM-Modell
-def create_sequences(data, sequence_length):
-    sequences = []
-    for i in range(len(data) - sequence_length):
-        sequence = data[i:i+sequence_length]
-        sequences.append(sequence)
-    return np.array(sequences)
+# Umwandeln der Daten in das LSTM-Eingabeformat (3D-Tensor)
+X_train_lstm = np.expand_dims(X_train_scaled, axis=1)
+X_test_lstm = np.expand_dims(X_test_scaled, axis=1)
 
-
-# Hyperparameter für das LSTM-Modell
-sequence_length = 24  # Länge der Eingabesequenz
-num_features = 4  # Anzahl der Merkmale in den Daten (Energieproduktion, Stunde, Wochentag, Monat)
-hidden_units = 50  # Anzahl der versteckten Einheiten im LSTM
-batch_size = 64  # Batch-Größe für das Training
-epochs = 10  # Anzahl der Epochen für das Training
-
-# Erstellen von Sequenzen für das LSTM-Modell
-X_train = create_sequences(train_data, sequence_length)
-y_train = train_data[sequence_length:]
-X_test = create_sequences(test_data, sequence_length)
-y_test = test_data[sequence_length:]
-
-# Modellinitialisierung und Training
+# Modellinitialisierung
 model = Sequential()
-model.add(LSTM(hidden_units, input_shape=(sequence_length, num_features)))
-model.add(Dense(num_features))
-model.compile(optimizer='adam', loss='mean_squared_error')
-model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
+model.add(LSTM(50, input_shape=(X_train_lstm.shape[1], X_train_lstm.shape[2])))
+model.add(Dense(1))
+model.compile(optimizer='adam', loss='mse')
+
+# Modelltraining
+model.fit(X_train_lstm, y_train, epochs=20, batch_size=32, verbose=2)
 
 # Vorhersagen für den Testdatensatz
-predictions = model.predict(X_test)
+predictions_scaled = model.predict(X_test_lstm)
+predictions = scaler.inverse_transform(predictions_scaled).flatten()
 
-# Umkehrung der Normalisierung für die Vorhersagen
-predictions_denormalized = scaler.inverse_transform(predictions)
-
-
-mse = mean_squared_error(test_data[sequence_length:], predictions_denormalized)
-mae = mean_absolute_error(test_data[sequence_length:], predictions_denormalized)
-mape = np.mean(np.abs((test_data[sequence_length:] - predictions_denormalized) / test_data[sequence_length:])) * 100
+# Berechnung der Metriken für die Vorhersagen
+mse = mean_squared_error(y_test, predictions)
+mae = mean_absolute_error(y_test, predictions)
 rmse = np.sqrt(mse)
-
 
 print("Mean Squared Error (MSE):", mse)
 print("Mean Absolute Error (MAE):", mae)
-print("Mean Absolute Percentage Error (MAPE):", mape)
 print("Root Mean Squared Error (RMSE):", rmse)
 
 # Plot der Vorhersagen
 plt.figure(figsize=(12, 6))
-plt.plot(df.index[sequence_length:], df['AT0090000000000000000X312X009800E'][sequence_length:], color='blue', label='Historical Data')
-plt.plot(df.index[-len(predictions_denormalized):], predictions_denormalized[:, 0], color='green', linestyle='--', label='Predicted Values')
+plt.plot(y_test, color='blue', label='Actual')
+plt.plot(predictions, color='green', linestyle='--', label='Predicted')
 plt.title('Energy Production Prediction (LSTM)')
-plt.xlabel('Timestamp')
+plt.xlabel('Time')
 plt.ylabel('Energy Production')
 plt.legend()
 plt.grid(True)
 plt.xticks(rotation=45)
 plt.tight_layout()
-plt.show()
-
-"""
-# Grafische Darstellung der Inputdaten
-plt.figure(figsize=(12, 6))
-plt.plot(future_timestamps, predictions_denormalized, color='green', linestyle='--', label='Predicted Values')
-plt.title('Energy Production Prediction for 30.12.2023')
-plt.xlabel('Timestamp')
-plt.ylabel('Energy Production')
-plt.legend()
-plt.grid(True)
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
-"""
-
