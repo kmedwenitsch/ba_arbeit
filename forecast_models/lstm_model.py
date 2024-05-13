@@ -9,7 +9,7 @@ import holidays
 import matplotlib.pyplot as plt
 
 # Lade den Datensatz
-data = pd.read_csv("Neudörfl_Production_bis_21042024_gesamt.csv")
+data = pd.read_csv("../input_data/Neudörfl_Production_bis_21042024_gesamt.csv")
 
 # Extrahiere Features aus dem Zeitstempel
 data['timestamp'] = pd.to_datetime(data['timestamp'], format='%d.%m.%Y %H:%M:%S')
@@ -43,7 +43,6 @@ train_data_scaled = scaler.fit_transform(train_data.drop(['timestamp', total_ene
 test_data_scaled = scaler.transform(test_data.drop(['timestamp', total_energy_column], axis=1))
 
 
-# Funktion zum Erstellen von Trainings- und Testdaten
 def create_dataset(X1, X2, X3, y, time_steps=1):
     """
     Diese Funktion erstellt Trainings- und Testdaten für das LSTM-Modell.
@@ -64,13 +63,13 @@ def create_dataset(X1, X2, X3, y, time_steps=1):
         # Extrahiere die letzten 'time_steps' historischen Features
         v1 = X1[i:(i + time_steps)]
         # Extrahiere die anderen Features
-        v2 = X2[i + time_steps]
-        # Extrahiere den Zeitstempel
-        v3 = X3[i + time_steps]
+        v2 = np.tile(X2[i + time_steps], (time_steps, 1))
+        # Extrahiere den Zeitstempel für jedes Zeitfenster
+        v3 = np.tile(X3[i + time_steps], (time_steps, 1))
         # Kombiniere historische, andere Features und Zeitstempel
-        v = np.concatenate((v1, v2, v3.reshape(-1, 1)), axis=1)
+        v = np.concatenate((v1, v2, v3), axis=1)
         Xs.append(v)
-        # Der nächste Zeitschritt wird als Zielvariable verwendet
+        # Das nächste Zeitschritt wird als Zielvariable verwendet
         ys.append(y.iloc[i + time_steps])
     return np.array(Xs), np.array(ys)
 
@@ -82,6 +81,19 @@ n_features_other = 4  # Anzahl der anderen Features (Stunde, Wochentag, Feiertag
 n_features_timestamp = 1  # Anzahl der Features für den Zeitstempel
 epochs = 50
 batch_size = 32
+
+
+# Trainingsdaten
+X_train_hist, X_train_other, X_train_timestamp, y_train = train_data_scaled[:, :n_features_hist], train_data_scaled[:, n_features_hist:-1], train_data_scaled[:, -1:], train_data[total_energy_column]
+
+# Erstelle die Trainingsdaten für das LSTM-Modell
+X_train, y_train = create_dataset(X_train_hist, X_train_other, X_train_timestamp, y_train, time_steps)
+
+# Testdaten
+X_test_hist, X_test_other, X_test_timestamp, y_test = test_data_scaled[:, :n_features_hist], test_data_scaled[:, n_features_hist:-1], test_data_scaled[:, -1:], test_data[total_energy_column]
+
+# Erstelle die Testdaten für das LSTM-Modell
+X_test, y_test = create_dataset(X_test_hist, X_test_other, X_test_timestamp, y_test, time_steps)
 
 
 # Funktion zum Trainieren des LSTM-Modells
@@ -97,21 +109,13 @@ def train_lstm_model(X_train, y_train):
         model (Sequential): Das trainierte LSTM-Modell.
     """
     model = Sequential()
-    model.add(LSTM(units=50, activation='relu', input_shape=(time_steps, n_features)))
+    model.add(LSTM(units=50, activation='relu',
+                   input_shape=(time_steps, n_features_hist + n_features_other + n_features_timestamp)))
     model.add(Dense(units=1))
     model.compile(optimizer='adam', loss='mse')
     model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=0)
     return model
 
-
-# Trainingsdaten
-X_train_hist, X_train_other, X_train_timestamp, y_train = train_data_scaled[:, :n_features_hist], train_data_scaled[:, n_features_hist:-1], train_data_scaled[:, -1:], train_data[total_energy_column]
-X_train, y_train = create_dataset(X_train_hist, X_train_other, X_train_timestamp, y_train, time_steps)
-
-
-# Testdaten
-X_test_hist, X_test_other, X_test_timestamp, y_test = test_data_scaled[:, :n_features_hist], test_data_scaled[:, n_features_hist:-1], test_data_scaled[:, -1:], test_data[total_energy_column]
-X_test, y_test = create_dataset(X_test_hist, X_test_other, X_test_timestamp, y_test, time_steps)
 
 # Trainiere das LSTM-Modell
 model = train_lstm_model(X_train, y_train)
