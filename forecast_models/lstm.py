@@ -67,8 +67,11 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Umwandeln der Daten in das LSTM-Eingabeformat (3D-Tensor)
-X_train_lstm = np.expand_dims(X_train_scaled, axis=1)
-X_test_lstm = np.expand_dims(X_test_scaled, axis=1)
+X_train_lstm = X_train_scaled.reshape((X_train_scaled.shape[0], 1, X_train_scaled.shape[1]))
+X_test_lstm = X_test_scaled.reshape((X_test_scaled.shape[0], 1, X_test_scaled.shape[1]))
+
+print("Shape of X_train_lstm:", X_train_lstm.shape)
+print("Shape of X_test_lstm:", X_test_lstm.shape)
 
 # Modellinitialisierung
 model = Sequential()
