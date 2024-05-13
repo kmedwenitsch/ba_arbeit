@@ -123,10 +123,30 @@ model = train_lstm_model(X_train, y_train)
 # Prognose der Gesamterzeugungsleistung
 total_energy_pred = model.predict(X_test)
 
-# Auswertung der Prognose
-mse_total, mae_total, rmse_total = mean_squared_error(y_test, total_energy_pred),\
-                                   mean_absolute_error(y_test, total_energy_pred),\
-                                   np.sqrt(mean_squared_error(y_test, total_energy_pred))
+# Entferne NaN-Werte aus den Vorhersagen und den tatsächlichen Werten
+mask_pred = ~np.isnan(total_energy_pred)
+mask_test = ~np.isnan(y_test)
+
+# Stelle sicher, dass die Form von mask_pred und mask_test gleich ist
+if mask_pred.shape != mask_test.shape:
+    mask_pred = mask_pred.flatten()
+    mask_test = mask_test.flatten()
+
+# Kombiniere die Masken
+mask = mask_pred & mask_test
+
+total_energy_pred_clean = total_energy_pred[mask]
+y_test_clean = y_test[mask]
+
+# Berechne die Metriken nur für nicht-NaN-Werte
+mse_total = mean_squared_error(y_test_clean, total_energy_pred_clean)
+mae_total = mean_absolute_error(y_test_clean, total_energy_pred_clean)
+rmse_total = np.sqrt(mse_total)
+
+
+
+
+
 print("Prognose für die Gesamterzeugungsleistung:")
 print("MSE:", mse_total)
 print("MAE:", mae_total)
