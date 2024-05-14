@@ -11,6 +11,18 @@ import matplotlib.pyplot as plt
 # Lade den Datensatz
 data = pd.read_csv("../input_data/Neudörfl_Production_bis_21042024_gesamt.csv")
 
+# Iteriere über die Spalten der Eingabedaten
+for col in data.columns:
+    # Überspringe die erste Spalte "timestamp"
+    if col == "timestamp":
+        continue
+
+    # Entferne NaN-Werte in der aktuellen Spalte, während die Zeitstempel beibehalten werden
+    data[col] = data[col].fillna(-999)
+
+# Dataframe ausgeben in csv Datei
+data.to_csv('data.csv')
+
 # Extrahiere Features aus dem Zeitstempel
 data['timestamp'] = pd.to_datetime(data['timestamp'], format='%d.%m.%Y %H:%M:%S')
 data['hour'] = data['timestamp'].dt.hour
@@ -30,7 +42,7 @@ total_energy_column = 'Total_Energy'
 individual_energy_columns = list(data.columns[1:-5])  # Alle außer der ersten (Zeitstempel) und letzten 5 Spalten
 
 # Aggregiere die Einzelzeitreihen zur Gesamterzeugungsleistung
-data[total_energy_column] = data[individual_energy_columns].sum(axis=1)
+data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x != -999].sum(), axis=1)
 
 # Splitte Daten in Trainings- und Testdaten
 train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
@@ -58,16 +70,18 @@ def create_dataset(X1, X2, X3, y, time_steps=1):
         Xs (array): Das Array der Features.
         ys (array): Das Array der Zielvariablen.
     """
+
     Xs, ys = [], []
     for i in range(len(X1) - time_steps):
-        # Extrahiere die letzten 'time_steps' historischen Features
-        v1 = X1[i:(i + time_steps)]
+        # Extrahiere die letzten 'time_steps' historischen Features, wobei -999 ignoriert wird
+        v1 = np.array(X1[i:(i + time_steps)][X1[i:(i + time_steps)] != -999])
+        v1_reshaped = v1.reshape(-1, 1)  # Form anpassen, falls erforderlich
         # Extrahiere die anderen Features
         v2 = np.tile(X2[i + time_steps], (time_steps, 1))
         # Extrahiere den Zeitstempel für jedes Zeitfenster
         v3 = np.tile(X3[i + time_steps], (time_steps, 1))
         # Kombiniere historische, andere Features und Zeitstempel
-        v = np.concatenate((v1, v2, v3), axis=1)
+        v = np.concatenate((v1_reshaped, v2, v3), axis=1)
         Xs.append(v)
         # Das nächste Zeitschritt wird als Zielvariable verwendet
         ys.append(y.iloc[i + time_steps])
@@ -79,7 +93,7 @@ time_steps = 96  # Anzahl der vergangenen Zeitschritte, die als Features berück
 n_features_hist = len(individual_energy_columns)  # Anzahl der historischen Features pro Zeitschritt (29 Einzelzeitreihen)
 n_features_other = 4  # Anzahl der anderen Features (Stunde, Wochentag, Feiertag, Monat)
 n_features_timestamp = 1  # Anzahl der Features für den Zeitstempel
-epochs = 50
+epochs = 20
 batch_size = 32
 
 
@@ -123,29 +137,10 @@ model = train_lstm_model(X_train, y_train)
 # Prognose der Gesamterzeugungsleistung
 total_energy_pred = model.predict(X_test)
 
-# Entferne NaN-Werte aus den Vorhersagen und den tatsächlichen Werten
-mask_pred = ~np.isnan(total_energy_pred)
-mask_test = ~np.isnan(y_test)
-
-# Stelle sicher, dass die Form von mask_pred und mask_test gleich ist
-if mask_pred.shape != mask_test.shape:
-    mask_pred = mask_pred.flatten()
-    mask_test = mask_test.flatten()
-
-# Kombiniere die Masken
-mask = mask_pred & mask_test
-
-total_energy_pred_clean = total_energy_pred[mask]
-y_test_clean = y_test[mask]
-
-# Berechne die Metriken nur für nicht-NaN-Werte
-mse_total = mean_squared_error(y_test_clean, total_energy_pred_clean)
-mae_total = mean_absolute_error(y_test_clean, total_energy_pred_clean)
+# Berechne die Metriken
+mse_total = mean_squared_error(y_test, total_energy_pred)
+mae_total = mean_absolute_error(y_test, total_energy_pred)
 rmse_total = np.sqrt(mse_total)
-
-
-
-
 
 print("Prognose für die Gesamterzeugungsleistung:")
 print("MSE:", mse_total)
