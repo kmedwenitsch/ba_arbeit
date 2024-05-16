@@ -50,9 +50,9 @@ X_test, y_test = create_dataset(test_data_scaled, test_data[total_energy_column]
 
 # Anpassung der Hyperparameter
 param_grid = {
-    'n_estimators': [200],
-    'learning_rate': [0.1],
-    'max_depth': [7],
+    'n_estimators': [150],
+    'learning_rate': [0.05],
+    'max_depth': [5],
     'subsample': [1.0],
     'colsample_bytree': [1.0],
     'gamma': [0.1]

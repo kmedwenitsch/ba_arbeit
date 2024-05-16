@@ -21,9 +21,6 @@ for col in data.columns:
     # Entferne NaN-Werte in der aktuellen Spalte, während die Zeitstempel beibehalten werden
     data[col] = data[col].fillna(-999)
 
-# Dataframe ausgeben in csv Datei
-data.to_csv('data.csv')
-
 # Extrahiere Features aus dem Zeitstempel
 data['timestamp'] = pd.to_datetime(data['timestamp'], format='%d.%m.%Y %H:%M:%S')
 data['hour'] = data['timestamp'].dt.hour
@@ -44,7 +41,6 @@ individual_energy_columns = list(data.columns[1:-5])  # Alle außer der ersten (
 
 # Aggregiere die Einzelzeitreihen zur Gesamterzeugungsleistung abzgl. der None Werte
 data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x != -999].sum(), axis=1)
-print(data[total_energy_column].to_string())
 
 # Splitte Daten in Trainings- und Testdaten
 train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
@@ -95,26 +91,18 @@ def train_lstm_model(X_train, y_train):
     model = Sequential()
     # LSTM-Schicht mit 200 Neuronen
     model.add(LSTM(units=200, activation='relu', return_sequences=True, input_shape=(time_steps, n_features)))
-    # Dropout zur Vermeidung von Überanpassung
-    model.add(Dropout(0.2))
     # LSTM-Schicht mit 100 Neuronen
     model.add(LSTM(units=100, activation='relu', return_sequences=True))
-    # Dropout zur Vermeidung von Überanpassung
-    model.add(Dropout(0.2))
-    # LSTM-Schicht mit 100 Neuronen ohne Rückgabe von Sequenzen
-    model.add(LSTM(units=100, activation='relu'))
-    # Dropout zur Vermeidung von Überanpassung
-    model.add(Dropout(0.2))
     # Dense-Schicht mit einer Ausgabe (Gesamterzeugungsleistung)
     model.add(Dense(units=1))
     # Kompilieren des Modells
     model.compile(optimizer='adam', loss='mse')
 
     # Lernratenreduzierung bei Plateau
-    reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=3, min_lr=0.0001)
+    #reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=3, min_lr=0.0001)
 
     # Training des Modells
-    model.fit(X_train, y_train, epochs=100, batch_size=8, verbose=1, callbacks=[reduce_lr])
+    model.fit(X_train, y_train, epochs=20, batch_size=16, verbose=1)
     return model
 
 
