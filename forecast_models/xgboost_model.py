@@ -48,18 +48,20 @@ time_steps = 96
 X_train, y_train = create_dataset(train_data_scaled, train_data[total_energy_column], time_steps)
 X_test, y_test = create_dataset(test_data_scaled, test_data[total_energy_column], time_steps)
 
-# Hyperparameter-Tuning mit Grid Search
+# Anpassung der Hyperparameter
 param_grid = {
-    'n_estimators': [100, 200, 300],  # Änderung der Anzahl der Bäume
-    'learning_rate': [0.05, 0.1, 0.2],  # Änderung der Lernrate
-    'max_depth': [3, 5, 7],  # Änderung der maximalen Baumtiefe
-    'subsample': [0.8, 1.0],  # Änderung der Unterstichprobenrate
-    'colsample_bytree': [0.8, 1.0],  # Änderung der Spaltenunterstichprobenrate
-    'gamma': [0, 0.1, 0.2]  # Hinzufügen von Gamma-Parameter zur Steuerung der Baumwachstumsbedingungen
+    'n_estimators': [200],
+    'learning_rate': [0.1],
+    'max_depth': [7],
+    'subsample': [1.0],
+    'colsample_bytree': [1.0],
+    'gamma': [0.1]
 }
 
-xgb_model = xgb.XGBRegressor(objective='reg:squarederror')
+# XGBoost-Modell mit angepassten Hyperparametern
+xgb_model = xgb.XGBRegressor(objective='reg:squarederror', n_jobs=-1)  # Verwende alle verfügbaren Kerne
 
+# Grid Search mit reduziertem Suchraum für schnelleres Training
 grid_search = GridSearchCV(estimator=xgb_model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error', verbose=1)
 grid_search.fit(X_train, y_train)
 
