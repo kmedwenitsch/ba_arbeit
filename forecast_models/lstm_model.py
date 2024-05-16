@@ -4,7 +4,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential
-from keras.layers import LSTM, Dense
+from keras.layers import LSTM, Dense, Dropout
+from keras.callbacks import ReduceLROnPlateau
 import holidays
 import matplotlib.pyplot as plt
 
@@ -56,6 +57,7 @@ scaler = MinMaxScaler(feature_range=(0, 1))
 train_data_scaled = scaler.fit_transform(train_data[feature_columns])
 test_data_scaled = scaler.transform(test_data[feature_columns])
 
+
 def create_dataset(X, y, time_steps=1):
     """
     Diese Funktion erstellt Trainings- und Testdaten für das LSTM-Modell.
@@ -76,6 +78,7 @@ def create_dataset(X, y, time_steps=1):
         ys.append(y.iloc[i + time_steps])
     return np.array(Xs), np.array(ys)
 
+
 # Parameter für das LSTM-Modell
 time_steps = 96  # Anzahl der vergangenen Zeitschritte, die als Features berücksichtigt werden sollen für die Prognosen
 n_features = len(feature_columns)  # Anzahl der Features
@@ -86,15 +89,34 @@ X_train, y_train = create_dataset(train_data_scaled, train_data[total_energy_col
 # Testdaten
 X_test, y_test = create_dataset(test_data_scaled, test_data[total_energy_column], time_steps)
 
+
 # Funktion zum Trainieren des LSTM-Modells
 def train_lstm_model(X_train, y_train):
     model = Sequential()
-    model.add(LSTM(units=100, activation='relu', return_sequences=True, input_shape=(time_steps, n_features)))
-    model.add(LSTM(units=50, activation='relu'))
+    # LSTM-Schicht mit 200 Neuronen
+    model.add(LSTM(units=200, activation='relu', return_sequences=True, input_shape=(time_steps, n_features)))
+    # Dropout zur Vermeidung von Überanpassung
+    model.add(Dropout(0.2))
+    # LSTM-Schicht mit 100 Neuronen
+    model.add(LSTM(units=100, activation='relu', return_sequences=True))
+    # Dropout zur Vermeidung von Überanpassung
+    model.add(Dropout(0.2))
+    # LSTM-Schicht mit 100 Neuronen ohne Rückgabe von Sequenzen
+    model.add(LSTM(units=100, activation='relu'))
+    # Dropout zur Vermeidung von Überanpassung
+    model.add(Dropout(0.2))
+    # Dense-Schicht mit einer Ausgabe (Gesamterzeugungsleistung)
     model.add(Dense(units=1))
+    # Kompilieren des Modells
     model.compile(optimizer='adam', loss='mse')
-    model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=1)
+
+    # Lernratenreduzierung bei Plateau
+    reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=3, min_lr=0.0001)
+
+    # Training des Modells
+    model.fit(X_train, y_train, epochs=100, batch_size=8, verbose=1, callbacks=[reduce_lr])
     return model
+
 
 # Trainiere das LSTM-Modell
 model = train_lstm_model(X_train, y_train)
