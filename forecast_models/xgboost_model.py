@@ -1,92 +1,103 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.preprocessing import MinMaxScaler
+import xgboost as xgb
+import holidays
+import matplotlib.pyplot as plt
 
-# CSV-Datei einlesen
-data = pd.read_csv('../input_data/Neudörfl_Production_bis_21042024_AT0090000000000000000X312X009800E.csv', parse_dates=['timestamp'])
+# Lade den Datensatz
+data = pd.read_csv("../input_data/Neudörfl_Production_bis_21042024_gesamt.csv")
 
-# Extrahieren von Merkmalen aus dem Zeitstempel
-data['timestamp'] = pd.to_datetime(data['timestamp'])
+# Iteriere über die Spalten der Eingabedaten
+for col in data.columns:
+    # Überspringe die erste Spalte "timestamp"
+    if col == "timestamp":
+        continue
+    # Entferne NaN-Werte in der aktuellen Spalte, während die Zeitstempel beibehalten werden
+    data[col] = data[col].fillna(-999)
+
+# Dataframe ausgeben in csv Datei
+data.to_csv('data.csv')
+
+# Extrahiere Features aus dem Zeitstempel
+data['timestamp'] = pd.to_datetime(data['timestamp'], format='%d.%m.%Y %H:%M:%S')
 data['hour'] = data['timestamp'].dt.hour
-data['day_of_week'] = data['timestamp'].dt.dayofweek
+data['weekday'] = data['timestamp'].dt.weekday
 data['month'] = data['timestamp'].dt.month
 
-# Manuell erstellte Liste von Feiertagen für Österreich
-holidays_2023 = [
-    '2023-01-01',  # Neujahr
-    '2023-01-06',  # Heilige Drei Könige
-    '2023-04-14',  # Karfreitag
-    '2023-04-17',  # Ostermontag
-    '2023-05-01',  # Tag der Arbeit
-    '2023-05-25',  # Christi Himmelfahrt
-    '2023-06-04',  # Pfingstsonntag
-    '2023-06-05',  # Pfingstmontag
-    '2023-06-15',  # Fronleichnam
-    '2023-10-26',  # Nationalfeiertag
-    '2023-11-01',  # Allerheiligen
-    '2023-12-08',  # Mariä Empfängnis
-    '2023-12-25',  # Weihnachten
-    '2023-12-26'   # Stephanitag
-]
+# Liste österreichischer Feiertage für die Jahre 2023 und 2024
+at_holidays = holidays.Austria(years=[2023, 2024])
 
-holidays_2024 = [
-    '2024-01-01',  # Neujahr
-    '2024-01-06',  # Heilige Drei Könige
-    '2024-03-29',  # Karfreitag
-    '2024-04-01',  # Ostermontag
-    '2024-05-01',  # Tag der Arbeit
-    '2024-05-09',  # Christi Himmelfahrt
-    '2024-05-19',  # Pfingstsonntag
-    '2024-05-20',  # Pfingstmontag
-    '2024-06-06',  # Fronleichnam
-    '2024-10-26',  # Nationalfeiertag
-    '2024-11-01',  # Allerheiligen
-    '2024-12-08',  # Mariä Empfängnis
-    '2024-12-25',  # Weihnachten
-    '2024-12-26'   # Stephanitag
-]
+# Erstelle Feature für Feiertage
+data['holiday'] = data['timestamp'].apply(lambda x: int(x in at_holidays))
 
-# Hinzufügen einer Spalte für Feiertage
-data['is_holiday'] = data['timestamp'].dt.date.astype('datetime64[ns]').isin(holidays_2023 + holidays_2024).astype(int)
+# Spalte für die gesamte Energieproduktion
+total_energy_column = 'Total_Energy'
 
-data.set_index('timestamp', inplace=True)
+# Spalten für individuelle Energieproduktion
+individual_energy_columns = list(data.columns[1:-5])  # Alle außer der ersten (Zeitstempel) und letzten 5 Spalten
 
-# Zufälliges Aufteilen der Daten in Trainings- und Testsets
-X = data[['hour', 'day_of_week', 'month', 'is_holiday']].values
-y = data['AT0090000000000000000X312X009800E'].values
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=True)
+# Aggregiere die Einzelzeitreihen zur Gesamterzeugungsleistung abzgl. der None Werte
+data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x != -999].sum(), axis=1)
+print(data[total_energy_column].to_string())
 
-# Modellinitialisierung und Training
-model = XGBRegressor()
-model.fit(X_train, y_train)
+# Splitte Daten in Trainings- und Testdaten
+train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
 
-# Vorhersagen für den Testdatensatz
-predictions = model.predict(X_test)
+# Skaliere die Daten
+scaler = MinMaxScaler(feature_range=(0, 1))
+# in training und test daten sind alle Spalten bis auf timestamp und summierte energie vorhanden
+# also alle individuellen residuallastwerte und die features dazu
+train_data_scaled = scaler.fit_transform(train_data.drop(['timestamp', total_energy_column], axis=1))
+test_data_scaled = scaler.transform(test_data.drop(['timestamp', total_energy_column], axis=1))
 
-# Clippen der Vorhersagen auf positive Werte
-predictions = np.clip(predictions, a_min=0, a_max=None)
+# Funktion zur Erstellung des Datensatzes für XGBoost
+def create_dataset(X, y, time_steps=1):
+    Xs, ys = [], []
+    for i in range(len(X) - time_steps):
+        Xs.append(X[i:(i + time_steps)].flatten())
+        ys.append(y.iloc[i + time_steps])
+    return np.array(Xs), np.array(ys)
 
-# Berechnung der Metriken für die Vorhersagen
-mse = mean_squared_error(y_test, predictions)
-mae = mean_absolute_error(y_test, predictions)
-rmse = np.sqrt(mse)
+# Parameter für das Modell
+time_steps = 96  # Anzahl der vergangenen Zeitschritte, die als Features berücksichtigt werden sollen für die Prognosen
 
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
+# Trainingsdaten
+X_train, y_train = create_dataset(train_data_scaled, train_data[total_energy_column], time_steps)
 
-# Plot der Vorhersagen
-plt.figure(figsize=(12, 6))
-plt.plot(y_test, color='blue', label='Actual')
-plt.plot(predictions, color='green', linestyle='--', label='Predicted')
-plt.title('Energy Production Prediction (XGBoost)')
-plt.xlabel('Time')
-plt.ylabel('Energy Production')
+# Testdaten
+X_test, y_test = create_dataset(test_data_scaled, test_data[total_energy_column], time_steps)
+
+# Funktion zum Trainieren des XGBoost-Modells
+def train_xgboost_model(X_train, y_train):
+    model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100, learning_rate=0.1, max_depth=5)
+    model.fit(X_train, y_train)
+    return model
+
+# Trainiere das XGBoost-Modell
+model = train_xgboost_model(X_train, y_train)
+
+# Prognose der Gesamterzeugungsleistung
+total_energy_pred = model.predict(X_test)
+
+# Berechne die Metriken
+mse_total = mean_squared_error(y_test, total_energy_pred)
+mae_total = mean_absolute_error(y_test, total_energy_pred)
+rmse_total = np.sqrt(mse_total)
+
+print("Prognose für die Gesamterzeugungsleistung:")
+print("MSE:", mse_total)
+print("MAE:", mae_total)
+print("RMSE:", rmse_total)
+
+# Plotte die Prognoseergebnisse
+plt.figure(figsize=(10, 6))
+plt.plot(y_test, label='Real')
+plt.plot(total_energy_pred, label='Total Energy Forecast')
+plt.xlabel('Time Steps')
+plt.ylabel('Energy Production (kWh)')
 plt.legend()
-plt.grid(True)
-plt.xticks(rotation=45)
-plt.tight_layout()
+plt.title('Total Energy Forecast vs. Real')
 plt.show()
