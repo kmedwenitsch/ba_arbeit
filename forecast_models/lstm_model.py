@@ -4,8 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, Dropout
-from keras.callbacks import ReduceLROnPlateau
+from keras.layers import LSTM, Dense
 import holidays
 import matplotlib.pyplot as plt
 
@@ -20,6 +19,9 @@ for col in data.columns:
 
     # Entferne NaN-Werte in der aktuellen Spalte, während die Zeitstempel beibehalten werden
     data[col] = data[col].fillna(-999)
+
+# Dataframe ausgeben in csv Datei
+data.to_csv('data.csv')
 
 # Extrahiere Features aus dem Zeitstempel
 data['timestamp'] = pd.to_datetime(data['timestamp'], format='%d.%m.%Y %H:%M:%S')
@@ -41,6 +43,7 @@ individual_energy_columns = list(data.columns[1:-5])  # Alle außer der ersten (
 
 # Aggregiere die Einzelzeitreihen zur Gesamterzeugungsleistung abzgl. der None Werte
 data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x != -999].sum(), axis=1)
+print(data[total_energy_column].to_string())
 
 # Splitte Daten in Trainings- und Testdaten
 train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
@@ -52,7 +55,6 @@ feature_columns = train_data.drop(['timestamp', total_energy_column], axis=1).co
 scaler = MinMaxScaler(feature_range=(0, 1))
 train_data_scaled = scaler.fit_transform(train_data[feature_columns])
 test_data_scaled = scaler.transform(test_data[feature_columns])
-
 
 def create_dataset(X, y, time_steps=1):
     """
@@ -74,7 +76,6 @@ def create_dataset(X, y, time_steps=1):
         ys.append(y.iloc[i + time_steps])
     return np.array(Xs), np.array(ys)
 
-
 # Parameter für das LSTM-Modell
 time_steps = 96  # Anzahl der vergangenen Zeitschritte, die als Features berücksichtigt werden sollen für die Prognosen
 n_features = len(feature_columns)  # Anzahl der Features
@@ -85,32 +86,24 @@ X_train, y_train = create_dataset(train_data_scaled, train_data[total_energy_col
 # Testdaten
 X_test, y_test = create_dataset(test_data_scaled, test_data[total_energy_column], time_steps)
 
-
 # Funktion zum Trainieren des LSTM-Modells
 def train_lstm_model(X_train, y_train):
     model = Sequential()
-    # LSTM-Schicht mit 200 Neuronen
-    model.add(LSTM(units=200, activation='relu', return_sequences=True, input_shape=(time_steps, n_features)))
-    # LSTM-Schicht mit 100 Neuronen
-    model.add(LSTM(units=100, activation='relu', return_sequences=True))
-    # Dense-Schicht mit einer Ausgabe (Gesamterzeugungsleistung)
+    model.add(LSTM(units=100, activation='relu', return_sequences=True, input_shape=(time_steps, n_features)))
+    model.add(LSTM(units=50, activation='relu'))
     model.add(Dense(units=1))
-    # Kompilieren des Modells
     model.compile(optimizer='adam', loss='mse')
-
-    # Lernratenreduzierung bei Plateau
-    #reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=3, min_lr=0.0001)
-
-    # Training des Modells
-    model.fit(X_train, y_train, epochs=20, batch_size=16, verbose=1)
+    model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=1)
     return model
-
 
 # Trainiere das LSTM-Modell
 model = train_lstm_model(X_train, y_train)
 
 # Prognose der Gesamterzeugungsleistung
 total_energy_pred = model.predict(X_test)
+
+df = pd.DataFrame(total_energy_pred, y_test)
+df.to_csv('output.csv')
 
 # Berechne die Metriken
 mse_total = mean_squared_error(y_test, total_energy_pred)
