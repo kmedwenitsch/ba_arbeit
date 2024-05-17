@@ -44,15 +44,15 @@ def create_dataset(X, y, time_steps=1):
         ys.append(y.iloc[i + time_steps])
     return np.array(Xs), np.array(ys)
 
-time_steps = 192
+time_steps = 96
 X_train, y_train = create_dataset(train_data_scaled, train_data[total_energy_column], time_steps)
 X_test, y_test = create_dataset(test_data_scaled, test_data[total_energy_column], time_steps)
 
 # Anpassung der Hyperparameter
 param_grid = {
-    'n_estimators': [150],
+    'n_estimators': [50],
     'learning_rate': [0.05],
-    'max_depth': [5],
+    'max_depth': [3],
     'subsample': [1.0],
     'colsample_bytree': [1.0],
     'gamma': [0.1]
