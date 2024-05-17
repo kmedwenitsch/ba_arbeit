@@ -43,7 +43,6 @@ individual_energy_columns = list(data.columns[1:-5])  # Alle außer der ersten (
 
 # Aggregiere die Einzelzeitreihen zur Gesamterzeugungsleistung abzgl. der None Werte
 data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x != -999].sum(), axis=1)
-print(data[total_energy_column].to_string())
 
 # Splitte Daten in Trainings- und Testdaten
 train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
@@ -90,7 +89,7 @@ X_test, y_test = create_dataset(test_data_scaled, test_data[total_energy_column]
 def train_lstm_model(X_train, y_train):
     model = Sequential()
     model.add(LSTM(units=100, activation='relu', return_sequences=True, input_shape=(time_steps, n_features)))
-    model.add(LSTM(units=50, activation='relu'))
+    model.add(LSTM(units=100, activation='relu'))
     model.add(Dense(units=1))
     model.compile(optimizer='adam', loss='mse')
     model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=1)
