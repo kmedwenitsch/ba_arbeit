@@ -17,11 +17,8 @@ for col in data.columns:
     if col == "timestamp":
         continue
 
-    # Entferne NaN-Werte in der aktuellen Spalte, während die Zeitstempel beibehalten werden
+    # Setze NaN-Werte in der aktuellen Spalte auf -999
     data[col] = data[col].fillna(-999)
-
-# Dataframe ausgeben in csv Datei
-data.to_csv('data.csv')
 
 # Extrahiere Features aus dem Zeitstempel
 data['timestamp'] = pd.to_datetime(data['timestamp'], format='%d.%m.%Y %H:%M:%S')

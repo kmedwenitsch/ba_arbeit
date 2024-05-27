@@ -12,11 +12,12 @@ data = pd.read_csv("../input_data/Neudörfl_Production_bis_21042024_gesamt.csv")
 
 # Iteriere über die Spalten der Eingabedaten
 for col in data.columns:
+    # Überspringe die erste Spalte "timestamp"
     if col == "timestamp":
         continue
-    data[col] = data[col].fillna(-999)
 
-data.to_csv('data.csv')
+    # Setze NaN-Werte in der aktuellen Spalte auf -999
+    data[col] = data[col].fillna(-999)
 
 # Extrahiere Features aus dem Zeitstempel
 data['timestamp'] = pd.to_datetime(data['timestamp'], format='%d.%m.%Y %H:%M:%S')
