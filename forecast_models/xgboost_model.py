@@ -29,7 +29,7 @@ at_holidays = holidays.Austria(years=[2023, 2024])
 data['holiday'] = data['timestamp'].apply(lambda x: int(x in at_holidays))
 
 total_energy_column = 'Total_Energy'
-individual_energy_columns = list(data.columns[1:-5])
+individual_energy_columns = list(data.columns[1:-4])
 
 data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x != -999].sum(), axis=1)
 

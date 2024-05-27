@@ -36,7 +36,7 @@ data['holiday'] = data['timestamp'].apply(lambda x: int(x in at_holidays))
 total_energy_column = 'Total_Energy'
 
 # Spalten für individuelle Energieproduktion
-individual_energy_columns = list(data.columns[1:-5])  # Alle außer der ersten (Zeitstempel) und letzten 5 Spalten
+individual_energy_columns = list(data.columns[1:-4])  # Alle außer der ersten (Zeitstempel) und letzten 4 Spalten
 
 # Aggregiere die Einzelzeitreihen zur Gesamterzeugungsleistung abzgl. der None Werte
 data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x != -999].sum(), axis=1)
