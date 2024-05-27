@@ -30,24 +30,42 @@ data['holiday'] = data['timestamp'].apply(lambda x: int(x in at_holidays))
 
 total_energy_column = 'Total_Energy'
 individual_energy_columns = list(data.columns[1:-5])
+
 data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x != -999].sum(), axis=1)
 
 train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
 
-scaler = MinMaxScaler(feature_range=(0, 1))
-train_data_scaled = scaler.fit_transform(train_data.drop(['timestamp', total_energy_column], axis=1))
-test_data_scaled = scaler.transform(test_data.drop(['timestamp', total_energy_column], axis=1))
+# Spaltenauswahl ohne 'timestamp' und 'Total_Energy'
+feature_columns = ['hour', 'weekday', 'month', 'holiday', total_energy_column]
+
+# Skaliere die Daten
+feature_scaler = MinMaxScaler(feature_range=(0, 1))
+target_scaler = MinMaxScaler(feature_range=(0, 1))
+train_X_data_scaled = feature_scaler.fit_transform(train_data[feature_columns])
+train_y_data_scaled = target_scaler.fit_transform(train_data[[total_energy_column]])
+test_X_data_scaled = feature_scaler.transform(test_data[feature_columns])
+test_y_data_scaled = target_scaler.transform(test_data[[total_energy_column]])
 
 def create_dataset(X, y, time_steps=1):
     Xs, ys = [], []
     for i in range(len(X) - time_steps):
-        Xs.append(X[i:(i + time_steps)].flatten())
-        ys.append(y.iloc[i + time_steps])
+        v = X[i:(i + time_steps)]
+        Xs.append(v)
+        ys.append(y[i + time_steps, -1])  # Die Zielvariable ist die Gesamterzeugungsleistung (letzte Spalte)
     return np.array(Xs), np.array(ys)
 
 time_steps = 96
-X_train, y_train = create_dataset(train_data_scaled, train_data[total_energy_column], time_steps)
-X_test, y_test = create_dataset(test_data_scaled, test_data[total_energy_column], time_steps)
+n_features = len(feature_columns)  # Anzahl der Features
+
+X_train, y_train = create_dataset(train_X_data_scaled, train_y_data_scaled, time_steps)
+X_test, y_test = create_dataset(test_X_data_scaled, test_y_data_scaled, time_steps)
+
+# Umformen der Daten
+n_samples, time_steps, n_features = X_train.shape
+X_train = X_train.reshape((n_samples, time_steps * n_features))
+
+n_samples, time_steps, n_features = X_test.shape
+X_test = X_test.reshape((n_samples, time_steps * n_features))
 
 # Anpassung der Hyperparameter
 param_grid = {
@@ -56,11 +74,12 @@ param_grid = {
     'max_depth': [3],
     'subsample': [1.0],
     'colsample_bytree': [1.0],
-    'gamma': [0.1]
+    'gamma': [0.05]
 }
 
 # XGBoost-Modell mit angepassten Hyperparametern
 xgb_model = xgb.XGBRegressor(objective='reg:squarederror', n_jobs=-1)  # Verwende alle verfügbaren Kerne
+# xgb_model.fit(X_train, y_train)
 
 # Grid Search mit reduziertem Suchraum für schnelleres Training
 grid_search = GridSearchCV(estimator=xgb_model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error', verbose=1)
@@ -69,7 +88,11 @@ grid_search.fit(X_train, y_train)
 best_model = grid_search.best_estimator_
 
 # Prognose der Gesamterzeugungsleistung
-total_energy_pred = best_model.predict(X_test)
+total_energy_pred_scaled = best_model.predict(X_test)
+total_energy_pred = target_scaler.inverse_transform(total_energy_pred_scaled.reshape(-1, 1)).flatten()
+
+df = pd.DataFrame(total_energy_pred, y_test)
+df.to_csv('output.csv')
 
 # Berechne die Metriken
 mse_total = mean_squared_error(y_test, total_energy_pred)
