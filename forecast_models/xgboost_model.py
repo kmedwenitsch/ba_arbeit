@@ -35,7 +35,7 @@ data[total_energy_column] = data[individual_energy_columns].apply(lambda x: x[x 
 
 train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
 
-# Spaltenauswahl ohne 'timestamp' und 'Total_Energy'
+# Spaltenauswahl ohne 'timestamp'
 feature_columns = ['hour', 'weekday', 'month', 'holiday', total_energy_column]
 
 # Skaliere die Daten

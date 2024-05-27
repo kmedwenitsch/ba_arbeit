@@ -24,13 +24,10 @@ at_holidays = holidays.Austria(years=[2023, 2024])
 data['holiday'] = data['timestamp'].apply(lambda x: int(x in at_holidays))
 
 # Spalten für individuelle Energieproduktion
-individual_energy_columns = list(data.columns[1:-5])  # Alle außer der ersten (Zeitstempel) und letzten 5 Spalten
+individual_energy_columns = list(data.columns[1:-4])  # Alle außer der ersten (Zeitstempel) und letzten 5 Spalten
 
 # Splitte Daten in Trainings- und Testdaten
 train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
-
-# Skaliere die Daten
-target_scaler = MinMaxScaler(feature_range=(0, 1))
 
 
 def create_dataset(X, y, time_steps=1):
@@ -39,7 +36,7 @@ def create_dataset(X, y, time_steps=1):
 
     Parameters:
         X (array): Die Features.
-        y (DataFrame): Die Zielvariablen.
+        y (array): Die Zielvariablen.
         time_steps (int): Die Anzahl der vergangenen Zeitpunkte, die als Features verwendet werden sollen.
 
     Returns:
@@ -50,7 +47,7 @@ def create_dataset(X, y, time_steps=1):
     for i in range(len(X) - time_steps):
         v = X[i:(i + time_steps)]
         Xs.append(v)
-        ys.append(y[i + time_steps, -1])  # Die Zielvariable ist die Gesamterzeugungsleistung (letzte Spalte)
+        ys.append(y[i + time_steps])  # Die Zielvariable ist die aktuelle individuelle Spalte
     return np.array(Xs), np.array(ys)
 
 
@@ -65,7 +62,6 @@ rmse_list = []
 
 for column in individual_energy_columns:
     try:
-
         print(f"Training model for column: {column}")
         # Trainingsdaten für die aktuelle Spalte
         train_data_column = train_data.dropna(subset=[column])
@@ -73,32 +69,37 @@ for column in individual_energy_columns:
 
         # Skaliere die Features für die aktuelle Spalte
         feature_scaler = MinMaxScaler(feature_range=(0, 1))
-        train_X_data_scaled = feature_scaler.fit_transform(train_data_column[['hour', 'weekday', 'month', 'holiday']])
-        test_X_data_scaled = feature_scaler.transform(test_data_column[['hour', 'weekday', 'month', 'holiday']])
+        target_scaler = MinMaxScaler(feature_range=(0, 1))
+
+        train_X_data_scaled = feature_scaler.fit_transform(
+            train_data_column[['hour', 'weekday', 'month', 'holiday'] + [column]])
+        train_y_data_scaled = target_scaler.fit_transform(train_data_column[[column]])
+
+        test_X_data_scaled = feature_scaler.transform(
+            test_data_column[['hour', 'weekday', 'month', 'holiday'] + [column]])
+        test_y_data_scaled = target_scaler.transform(test_data_column[[column]])
 
         # Trainingsdaten und Zielvariablen
-        X_train_column, y_train_column = create_dataset(train_X_data_scaled,
-                                                        target_scaler.fit_transform(train_data_column[[column]]),
-                                                        time_steps)
-
-        # Testdaten und Zielvariablen
-        X_test_column, y_test_column = create_dataset(test_X_data_scaled,
-                                                      target_scaler.transform(test_data_column[[column]]), time_steps)
+        y_train_column_scaled = train_y_data_scaled
+        y_test_column_scaled = test_y_data_scaled
+        X_train_column, y_train_column = create_dataset(train_X_data_scaled, y_train_column_scaled, time_steps)
+        X_test_column, y_test_column = create_dataset(test_X_data_scaled, y_test_column_scaled, time_steps)
 
         # Erstelle und trainiere das LSTM-Modell für die aktuelle Spalte
         model = Sequential()
-        model.add(LSTM(units=100, activation='relu', return_sequences=True, input_shape=(time_steps, 4)))
+        model.add(LSTM(units=100, activation='relu', return_sequences=True,
+                       input_shape=(time_steps, train_X_data_scaled.shape[1])))
         model.add(LSTM(units=100, activation='relu'))
         model.add(Dense(units=1))
         model.compile(optimizer='adam', loss='mse')
-        model.fit(X_train_column, y_train_column, epochs=20, batch_size=32, verbose=1)
+        model.fit(X_train_column, y_train_column, epochs=10, batch_size=32, verbose=0)
 
         # Prognose für die aktuelle Spalte
         column_pred_scaled = model.predict(X_test_column)
         column_pred = target_scaler.inverse_transform(column_pred_scaled).flatten()
 
         # Rückskalieren der Zielvariablen
-        y_test_column = target_scaler.inverse_transform(y_test_column.reshape(1, -1)).flatten()
+        y_test_column = target_scaler.inverse_transform(y_test_column.reshape(-1, 1)).flatten()
 
         # Überprüfen auf NaN-Werte vor der Berechnung der Metriken
         if np.isnan(column_pred).any() or np.isnan(y_test_column).any():
