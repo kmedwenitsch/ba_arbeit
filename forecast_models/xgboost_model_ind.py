@@ -91,7 +91,7 @@ for column in individual_energy_columns:
             'max_depth': [3],
             'subsample': [1.0],
             'colsample_bytree': [1.0],
-            'gamma': [0.05]
+            'gamma': [0.1]
         }
 
         # XGBoost-Modell mit angepassten Hyperparametern

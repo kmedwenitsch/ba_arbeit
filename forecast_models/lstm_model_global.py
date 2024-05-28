@@ -97,7 +97,7 @@ def train_lstm_model(X_train, y_train):
     model.add(LSTM(units=100, activation='relu'))
     model.add(Dense(units=1))
     model.compile(optimizer='adam', loss='mse')
-    model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=1)
+    model.fit(X_train, y_train, epochs=10, batch_size=32, verbose=1)
     return model
 
 # Trainiere das LSTM-Modell
