@@ -84,6 +84,13 @@ for column in individual_energy_columns:
         X_train_column, y_train_column = create_dataset(train_X_data_scaled, y_train_column_scaled, time_steps)
         X_test_column, y_test_column = create_dataset(test_X_data_scaled, y_test_column_scaled, time_steps)
 
+        # Umformen der Daten
+        n_samples, time_steps, n_features = X_train_column.shape
+        X_train_column = X_train_column.reshape((n_samples, time_steps * n_features))
+
+        n_samples, time_steps, n_features = X_test_column.shape
+        X_test_column = X_test_column.reshape((n_samples, time_steps * n_features))
+
         # Anpassung der Hyperparameter
         param_grid = {
             'n_estimators': [50],
