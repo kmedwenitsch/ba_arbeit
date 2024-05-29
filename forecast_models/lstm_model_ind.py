@@ -123,10 +123,16 @@ for column in individual_energy_columns:
 
 # Berechne den Durchschnitt der Metriken über alle Modelle
 avg_mse = np.mean(mse_list)
+std_mse = np.std(mae_list)
 avg_mae = np.mean(mae_list)
+std_mae = np.std(mae_list)
 avg_rmse = np.mean(rmse_list)
+std_rmse = np.std(rmse_list)
 
 print("Average Metrics:")
 print("Average MSE:", avg_mse)
+print("Standard deviation MSE:", std_mse)
 print("Average MAE:", avg_mae)
+print("Standard deviation MAE:", std_mae)
 print("Average RMSE:", avg_rmse)
+print("Standard deviation RMSE:", std_rmse)
