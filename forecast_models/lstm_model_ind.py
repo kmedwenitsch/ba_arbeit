@@ -59,6 +59,7 @@ models = {}
 mse_list = []
 mae_list = []
 rmse_list = []
+validation = {}
 
 for column in individual_energy_columns:
     try:
@@ -117,6 +118,8 @@ for column in individual_energy_columns:
 
         models[column] = model
 
+        validation[f"{column}"] = [mse_column, mae_column, rmse_column]
+
     except Exception as e:
         print(f"Berechnung der Metriken für Spalte {column} nicht möglich: {e}")
         continue
@@ -136,3 +139,15 @@ print("Average MAE:", avg_mae)
 print("Standard deviation MAE:", std_mae)
 print("Average RMSE:", avg_rmse)
 print("Standard deviation RMSE:", std_rmse)
+
+validation["Average MSE"] = avg_mse
+validation["Average MAE"] = avg_mae
+validation["Average RMSE"] = avg_rmse
+validation["Standard deviation MSE"] = std_mse
+validation["Standard deviation MAE"] = std_mae
+validation["Standard deviation RMSE"] = std_rmse
+
+print(validation)
+
+evaluation = pd.DataFrame(validation)
+evaluation.to_csv("evaluation.csv")
